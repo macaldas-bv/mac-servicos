@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC Serviços | Menu</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <main>
+        <div class="launcher-container">
+            <div class="logo launcher-logo">
+                <i data-lucide="wrench"></i> MAC SERVIÇOS
+            </div>
+
+            <div class="launcher-grid">
+                <a href="os-do-dia.html" class="launcher-item">
+                    <i data-lucide="calendar-days"></i> OS do Dia
+                </a>
+                <a href="clientes.html" class="launcher-item">
+                    <i data-lucide="users"></i> Clientes
+                </a>
+                <a href="nova-os.html" class="launcher-item">
+                    <i data-lucide="plus-circle"></i> Nova OS
+                </a>
+                <a href="historico.html" class="launcher-item">
+                    <i data-lucide="clipboard-list"></i> Relatórios
+                </a>
+                <a href="configuracoes.html" class="launcher-item">
+                    <i data-lucide="settings"></i> Configurações
+                </a>
+            </div>
+
+            <!-- Stats Preview on Home -->
+            <div style="margin-top: 2rem;">
+                <h3 id="welcome-msg" style="margin-bottom: 1rem; font-weight: 700; color: var(--text-primary);">Resumo</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-label">Serviços/Mês</span>
+                        <span class="stat-value" id="dash-servicos">0</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-label">Receita/Mês</span>
+                        <span class="stat-value primary" id="dash-receita">R$ 0,00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+</body>
+</html>

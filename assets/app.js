@@ -1,0 +1,466 @@
+const KEYS = { CLIENTES: 'mac_clientes', ORDENS: 'mac_ordens', SETTINGS: 'mac_settings' };
+
+let clientes = JSON.parse(localStorage.getItem(KEYS.CLIENTES)) || [];
+let ordens = JSON.parse(localStorage.getItem(KEYS.ORDENS)) || [];
+let config = JSON.parse(localStorage.getItem(KEYS.SETTINGS)) || { name: 'Miranda', phone: '', hourRate: 100 };
+
+const refreshIcons = () => { if (window.lucide) lucide.createIcons(); };
+
+const showToast = (msg, icon = 'check') => {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<i data-lucide="${icon}"></i> <span>${msg}</span>`;
+    container.appendChild(toast);
+    refreshIcons();
+    setTimeout(() => toast.remove(), 3000);
+};
+
+// --- DATA PERSISTENCE ---
+const saveToLocal = () => {
+    localStorage.setItem(KEYS.CLIENTES, JSON.stringify(clientes));
+    localStorage.setItem(KEYS.ORDENS, JSON.stringify(ordens));
+    localStorage.setItem(KEYS.SETTINGS, JSON.stringify(config));
+};
+
+// --- SHARED UI FUNCTIONS ---
+window.sendWA = (id) => {
+    const o = ordens.find(x => x.id === id);
+    if (!o) return;
+    const text = `*RELATÓRIO DE SERVIÇO*\n📅 Data: ${o.date.split('-').reverse().join('/')}\n👤 Cliente: ${o.clientName}\n\n*Serviço:*\n${o.desc}\n\n*Total:* R$ ${parseFloat(o.total).toFixed(2)}\n\n_${config.name}_`;
+    window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
+};
+
+window.copyOS = (id) => {
+    const o = ordens.find(x => x.id === id);
+    if (!o) return;
+    const text = `Relatório: ${o.clientName} - R$ ${o.total}`;
+    navigator.clipboard.writeText(text).then(() => showToast('Copiado!'));
+};
+
+// --- INITIALIZATION ---
+window.addEventListener('DOMContentLoaded', () => {
+    refreshIcons();
+    
+    // Initialize specific page logic
+    const path = window.location.pathname;
+    if (path.includes('os-do-dia.html')) initTodayOS();
+    if (path.includes('clientes.html')) initCustomers();
+    if (path.includes('nova-os.html')) initOS();
+    if (path.includes('historico.html')) initHistory();
+    if (path.includes('configuracoes.html')) initSettings();
+    if (path.endsWith('/') || path.includes('index.html')) initDashboard();
+});
+
+// --- DASHBOARD (index.html) ---
+function initDashboard() {
+    const dashClientes = document.getElementById('dash-clientes');
+    if (dashClientes) dashClientes.innerText = clientes.length;
+    
+    const dashServicos = document.getElementById('dash-servicos');
+    if (dashServicos) {
+        const now = new Date();
+        const mesOrdens = ordens.filter(o => new Date(o.date).getMonth() === now.getMonth());
+        dashServicos.innerText = mesOrdens.length;
+        
+        const dashReceita = document.getElementById('dash-receita');
+        if (dashReceita) {
+            const receita = mesOrdens.reduce((s, o) => s + parseFloat(o.total), 0);
+            dashReceita.innerText = `R$ ${receita.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+        }
+    }
+
+    const list = document.getElementById('dash-recent');
+    if (list) {
+        list.innerHTML = '';
+        ordens.slice(-3).reverse().forEach(o => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.style.padding = '1rem';
+            card.innerHTML = `<strong>${o.clientName}</strong><br><small>${o.date.split('-').reverse().join('/')} - R$ ${parseFloat(o.total).toFixed(2)}</small>`;
+            list.appendChild(card);
+        });
+    }
+}
+
+// --- CLIENTES ---
+function initCustomers() {
+    const form = document.getElementById('customer-form');
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const id = document.getElementById('cust-id').value;
+            const data = { 
+                id: id || Date.now().toString(), 
+                name: document.getElementById('cust-name').value, 
+                phone: document.getElementById('cust-phone').value, 
+                city: document.getElementById('cust-city').value,
+                address: document.getElementById('cust-address').value
+            };
+            if (id) { const idx = clientes.findIndex(c => c.id === id); clientes[idx] = data; }
+            else { clientes.push(data); }
+            saveToLocal();
+            e.target.reset(); document.getElementById('cust-id').value = '';
+            showToast('Cliente salvo!'); renderCustomers();
+        };
+    }
+    renderCustomers();
+}
+
+function renderCustomers() {
+    const list = document.getElementById('customer-list');
+    if (!list) return;
+    list.innerHTML = '';
+    clientes.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'item-card';
+        div.innerHTML = `
+            <div class="card-header"><strong>${c.name}</strong><small>${c.phone}</small></div>
+            <div class="card-footer">
+                <button class="btn btn-secondary btn-sm" onclick="editCust('${c.id}')">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="delCust('${c.id}')">Excluir</button>
+            </div>`;
+        list.appendChild(div);
+    });
+}
+
+window.editCust = (id) => {
+    const c = clientes.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('cust-id').value = c.id;
+    document.getElementById('cust-name').value = c.name;
+    document.getElementById('cust-phone').value = c.phone;
+    document.getElementById('cust-city').value = c.city;
+    document.getElementById('cust-address').value = c.address || '';
+    window.scrollTo(0, 0);
+};
+
+window.delCust = (id) => {
+    if (confirm('Excluir cliente?')) {
+        clientes = clientes.filter(x => x.id !== id);
+        saveToLocal();
+        showToast('Cliente excluído', 'trash'); renderCustomers();
+    }
+};
+
+// --- OS ---
+function initOS() {
+    const sel = document.getElementById('os-client');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Selecione o cliente...</option>';
+    clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}</option>`);
+    
+    const dateInput = document.getElementById('os-date');
+    if (dateInput) dateInput.valueAsDate = new Date();
+    
+    const hourRateInput = document.getElementById('os-val-hour');
+    if (hourRateInput) hourRateInput.value = config.hourRate;
+
+    // Check for Edit Mode
+    const editId = sessionStorage.getItem('mac_edit_os');
+    if (editId) {
+        const o = ordens.find(x => x.id === editId);
+        if (o) {
+            document.getElementById('os-id').value = o.id;
+            const client = clientes.find(c => c.phone === o.clientPhone);
+            if (client) document.getElementById('os-client').value = client.id;
+            document.getElementById('os-date').value = o.date;
+            document.getElementById('os-desc').value = o.desc;
+            document.getElementById('os-type').value = o.type;
+            document.getElementById('os-mat').value = o.mat || '';
+            
+            if (o.type === 'fixo') {
+                document.getElementById('os-val-fixo').value = o.total;
+            } else {
+                // For hourly, we don't store separate val/hour in the OS object currently
+                // but we can try to guess or just let user re-enter
+                document.getElementById('group-fixo').style.display = 'none';
+                document.getElementById('group-hora').style.display = 'block';
+                document.getElementById('group-hora-2').style.display = 'block';
+            }
+            document.querySelector('button[type="submit"]').innerHTML = '<i data-lucide="save"></i> ATUALIZAR OS';
+        }
+        sessionStorage.removeItem('mac_edit_os');
+    }
+
+    const osType = document.getElementById('os-type');
+    if (osType) {
+        osType.onchange = (e) => {
+            const isHora = e.target.value === 'hora';
+            document.getElementById('group-fixo').style.display = isHora ? 'none' : 'block';
+            document.getElementById('group-hora').style.display = isHora ? 'block' : 'none';
+            document.getElementById('group-hora-2').style.display = isHora ? 'block' : 'none';
+        };
+    }
+
+    const form = document.getElementById('os-form');
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const id = document.getElementById('os-id').value;
+            const type = document.getElementById('os-type').value;
+            const cliente = clientes.find(c => c.id === document.getElementById('os-client').value);
+            if (!cliente) { alert('Selecione um cliente!'); return; }
+            
+            let total = 0;
+            if (type === 'fixo') total = parseFloat(document.getElementById('os-val-fixo').value || 0);
+            else total = parseFloat(document.getElementById('os-hours').value || 0) * parseFloat(document.getElementById('os-val-hour').value || 0);
+
+            const osData = {
+                id: id || Date.now().toString(), 
+                clientName: cliente.name, 
+                clientPhone: cliente.phone,
+                date: document.getElementById('os-date').value, 
+                desc: document.getElementById('os-desc').value,
+                total: total, 
+                type: type, 
+                hours: type === 'hora' ? parseFloat(document.getElementById('os-hours').value || 0) : null,
+                rate: type === 'hora' ? parseFloat(document.getElementById('os-val-hour').value || 0) : null,
+                mat: document.getElementById('os-mat').value
+            };
+
+            if (id) {
+                const idx = ordens.findIndex(x => x.id === id);
+                if (idx !== -1) ordens[idx] = osData;
+            } else {
+                ordens.push(osData);
+            }
+
+            saveToLocal();
+            showToast(id ? 'OS atualizada!' : 'Ordem de serviço salva!');
+            setTimeout(() => window.location.href = 'historico.html', 1000);
+        };
+    }
+}
+
+// --- RELATÓRIOS (HISTÓRICO) ---
+function initHistory() {
+    const list = document.getElementById('history-list');
+    if (!list) return;
+
+    const filterClient = document.getElementById('filter-client');
+    const filterMonth = document.getElementById('filter-month');
+    const btnFilter = document.getElementById('btn-filter');
+    const btnSendReport = document.getElementById('btn-send-report');
+    const summaryCard = document.getElementById('report-summary');
+    const reportTotal = document.getElementById('report-total');
+    const reportCount = document.getElementById('report-count');
+
+    // Populate client filter
+    if (filterClient) {
+        filterClient.innerHTML = '<option value="">Todos os Clientes</option>';
+        clientes.forEach(c => filterClient.innerHTML += `<option value="${c.phone}">${c.name}</option>`);
+    }
+
+    // Set default month to current
+    if (filterMonth && !filterMonth.value) {
+        const now = new Date();
+        filterMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    let currentFiltered = [];
+
+    const renderFiltered = () => {
+        const clientVal = filterClient ? filterClient.value : '';
+        const monthVal = filterMonth ? filterMonth.value : '';
+
+        currentFiltered = ordens.slice().reverse();
+
+        if (clientVal) {
+            currentFiltered = currentFiltered.filter(o => o.clientPhone === clientVal);
+        }
+
+        if (monthVal) {
+            currentFiltered = currentFiltered.filter(o => o.date.startsWith(monthVal));
+        }
+
+        list.innerHTML = '';
+        let totalVal = 0;
+
+        if (currentFiltered.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:3rem; color:var(--text-secondary)">Nenhum registro encontrado para este filtro.</div>';
+            if (summaryCard) summaryCard.style.display = 'none';
+        } else {
+            currentFiltered.forEach(o => {
+                totalVal += parseFloat(o.total);
+                const cliente = clientes.find(c => c.phone === o.clientPhone) || {};
+                const card = document.createElement('div');
+                card.className = 'item-card';
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div>
+                            <strong>${o.clientName}</strong><br>
+                            <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
+                        </div>
+                        <small>${o.date.split('-').reverse().join('/')}</small>
+                    </div>
+                    <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
+                    <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
+                    <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
+                    <div class="card-footer">
+                        <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
+                        <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
+                    </div>`;
+                list.appendChild(card);
+            });
+
+            // Update Summary
+            if (summaryCard) {
+                summaryCard.style.display = 'block';
+                reportTotal.innerText = `R$ ${totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+                reportCount.innerText = `${currentFiltered.length} serviço(s) no período`;
+            }
+        }
+        refreshIcons();
+    };
+
+    if (btnFilter) btnFilter.onclick = renderFiltered;
+    
+    if (btnSendReport) {
+        btnSendReport.onclick = () => {
+            if (currentFiltered.length === 0) return;
+            
+            const clientPhone = currentFiltered[0].clientPhone;
+            const clientName = currentFiltered[0].clientName;
+            let total = 0;
+            
+            let message = `*RELATÓRIO DE SERVIÇOS*\n`;
+            message += `👤 *Cliente:* ${clientName}\n`;
+            message += `📅 *Período:* ${filterMonth.value.split('-').reverse().join('/')}\n`;
+            message += `----------------------------\n\n`;
+            
+            currentFiltered.slice().reverse().forEach(o => {
+                const date = o.date.split('-').reverse().join('/');
+                message += `📅 ${date}\n🛠️ ${o.desc}\n`;
+                if (o.type === 'hora' && o.hours && o.rate) {
+                    message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h\n`;
+                }
+                message += `💰 R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
+                total += parseFloat(o.total);
+            });
+            
+            message += `----------------------------\n`;
+            message += `*TOTAL:* R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n`;
+            
+            if (config.pix) {
+                message += `*PAGAMENTO PIX:*\n🔑 Chave: ${config.pix}\n\n`;
+            }
+            
+            message += `_${config.name}_`;
+            
+            window.open(`https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+        };
+    }
+    
+    renderFiltered();
+}
+
+// --- OS DO DIA ---
+function initTodayOS() {
+    const list = document.getElementById('today-os-list');
+    if (!list) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const todayOrders = ordens.filter(o => o.date === today);
+    
+    list.innerHTML = '';
+    
+    if (todayOrders.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:3rem; color:var(--text-secondary)">Não há serviços agendados para hoje.</div>';
+        return;
+    }
+
+    todayOrders.reverse().forEach(o => {
+        const cliente = clientes.find(c => c.phone === o.clientPhone) || {};
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <div class="card-header">
+                <div>
+                    <strong>${o.clientName}</strong><br>
+                    <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
+                </div>
+                <small>${o.date.split('-').reverse().join('/')}</small>
+            </div>
+            <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
+            <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
+            <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
+            <div class="card-footer">
+                <button class="btn btn-whatsapp btn-sm" onclick="sendWA('${o.id}')"><i data-lucide="send"></i> Zap</button>
+                <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
+            </div>`;
+        list.appendChild(card);
+    });
+    refreshIcons();
+}
+
+window.editOS = (id) => {
+    sessionStorage.setItem('mac_edit_os', id);
+    window.location.href = 'nova-os.html';
+};
+
+window.delOS = (id) => {
+    if (confirm('Deseja excluir esta ordem de serviço?')) {
+        ordens = ordens.filter(x => x.id !== id);
+        saveToLocal();
+        showToast('OS excluída!', 'trash');
+        if (window.location.pathname.includes('historico.html')) initHistory();
+        if (window.location.pathname.includes('os-do-dia.html')) initTodayOS();
+    }
+};
+
+// --- SETTINGS ---
+function initSettings() {
+    const setName = document.getElementById('set-name');
+    if (setName) {
+        setName.value = config.name;
+        document.getElementById('set-phone').value = config.phone;
+        document.getElementById('set-pix').value = config.pix || '';
+        document.getElementById('set-hour-rate').value = config.hourRate;
+    }
+
+    const form = document.getElementById('settings-form');
+    if (form) {
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            config = { 
+                name: document.getElementById('set-name').value, 
+                phone: document.getElementById('set-phone').value, 
+                pix: document.getElementById('set-pix').value,
+                hourRate: document.getElementById('set-hour-rate').value 
+            };
+            saveToLocal();
+            showToast('Configurações salvas!');
+        };
+    }
+}
+
+// --- BACKUP ---
+window.exportData = () => {
+    const data = { clientes, ordens, config };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `backup_mac_${new Date().toISOString().split('T')[0]}.json`;
+    a.click(); showToast('Backup exportado!');
+};
+
+window.importData = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (res) => {
+        try {
+            const data = JSON.parse(res.target.result);
+            if (data.clientes && data.ordens) {
+                clientes = data.clientes; ordens = data.ordens; config = data.config || config;
+                saveToLocal();
+                showToast('Dados importados!');
+                setTimeout(() => location.reload(), 1000);
+            }
+        } catch (err) { alert('Arquivo de backup inválido!'); }
+    };
+    reader.readAsText(file);
+};

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC Serviços | Histórico</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <main>
+        <header class="screen-header">
+            <a href="index.html" class="btn-back"><i data-lucide="chevron-left"></i> Voltar</a>
+            <h1>Relatórios</h1>
+            <div style="width: 60px;"></div>
+        </header>
+
+        <div class="screen-content">
+            <!-- Filter Bar -->
+            <div class="form-container" style="margin-bottom: 1.5rem; padding: 1rem;">
+                <div class="form-grid" style="grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label>Filtrar por Cliente</label>
+                        <select id="filter-client">
+                            <option value="">Todos os Clientes</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Mês</label>
+                        <input type="month" id="filter-month">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button id="btn-filter" class="btn btn-primary" style="width: 100%; padding: 0.8rem;">
+                            <i data-lucide="search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Card -->
+            <div id="report-summary" class="stat-card" style="margin-bottom: 1.5rem; display: none; background: var(--primary-light); border-color: var(--primary-color);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span class="stat-label" style="color: var(--primary-color)">Total do Período</span>
+                        <span class="stat-value primary" id="report-total" style="font-size: 1.75rem;">R$ 0,00</span>
+                        <small id="report-count" style="color: var(--text-secondary); font-weight: 600;"></small>
+                    </div>
+                    <button id="btn-send-report" class="btn btn-whatsapp" style="padding: 0.8rem 1.2rem;">
+                        <i data-lucide="send"></i> Relatório
+                    </button>
+                </div>
+            </div>
+
+            <div id="history-list" class="card-list"></div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAC Serviços | Clientes</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+    <div id="toast-container"></div>
+
+    <main>
+        <header class="screen-header">
+            <a href="index.html" class="btn-back"><i data-lucide="chevron-left"></i> Voltar</a>
+            <h1>Clientes</h1>
+            <div style="width: 60px;"></div> <!-- Spacer -->
+        </header>
+
+        <div class="screen-content">
+            <div class="form-container">
+                <form id="customer-form">
+                    <input type="hidden" id="cust-id">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Nome Completo *</label><input type="text" id="cust-name" required placeholder="Ex: João Silva"></div>
+                        <div class="form-group"><label>WhatsApp *</label><input type="text" id="cust-phone" required placeholder="(00) 00000-0000"></div>
+                        <div class="form-group"><label>Cidade</label><input type="text" id="cust-city" placeholder="Ex: São Paulo"></div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Endereço Completo</label><input type="text" id="cust-address" placeholder="Rua, número, bairro..."></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="margin-top: 1.5rem; width: 100%;"><i data-lucide="save"></i> SALVAR CLIENTE</button>
+                </form>
+            </div>
+            
+            <h3 style="margin-bottom: 1.25rem; font-weight: 700;">Lista de Clientes</h3>
+            <div id="customer-list" class="card-list"></div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+</body>
+</html>
