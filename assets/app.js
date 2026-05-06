@@ -42,6 +42,7 @@ window.sendWA = (id) => {
 
     if (o.matCost) {
         message += `📦 Materiais: R$ ${o.matCost.toFixed(2)}\n`;
+        if (o.mat) message += `📝 Itens: ${o.mat}\n`;
     }
     
     message += `\n*TOTAL:* R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
@@ -375,6 +376,7 @@ function initHistory() {
 
                 if (o.matCost) {
                     message += `📦 Materiais: R$ ${o.matCost.toFixed(2)}\n`;
+                    if (o.mat) message += `📝 Itens: ${o.mat}\n`;
                 }
                 
                 message += `✅ *Subtotal:* R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
