@@ -28,8 +28,31 @@ const saveToLocal = () => {
 window.sendWA = (id) => {
     const o = ordens.find(x => x.id === id);
     if (!o) return;
-    const text = `*RELATÓRIO DE SERVIÇO*\n📅 Data: ${o.date.split('-').reverse().join('/')}\n👤 Cliente: ${o.clientName}\n\n*Serviço:*\n${o.desc}\n\n*Total:* R$ ${parseFloat(o.total).toFixed(2)}\n\n_${config.name}_`;
-    window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
+    
+    let message = `*RELATÓRIO DE SERVIÇO*\n`;
+    message += `📅 Data: ${o.date.split('-').reverse().join('/')}\n`;
+    message += `👤 Cliente: ${o.clientName}\n\n`;
+    message += `*Serviço:*\n${o.desc}\n\n`;
+    
+    if (o.type === 'hora' && o.hours && o.rate) {
+        message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h = R$ ${o.serviceVal.toFixed(2)}\n`;
+    } else if (o.serviceVal) {
+        message += `💰 Valor Mão de Obra: R$ ${o.serviceVal.toFixed(2)}\n`;
+    }
+
+    if (o.matCost) {
+        message += `📦 Materiais: R$ ${o.matCost.toFixed(2)}\n`;
+    }
+    
+    message += `\n*TOTAL:* R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
+    
+    if (config.pix) {
+        message += `*PAGAMENTO PIX:*\n🔑 Chave: ${config.pix}\n\n`;
+    }
+    
+    message += `_${config.name}_`;
+    
+    window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
 };
 
 window.copyOS = (id) => {
@@ -169,12 +192,17 @@ function initOS() {
             document.getElementById('os-desc').value = o.desc;
             document.getElementById('os-type').value = o.type;
             document.getElementById('os-mat').value = o.mat || '';
+            document.getElementById('os-val-mat').value = o.matCost || '';
             
             if (o.type === 'fixo') {
-                document.getElementById('os-val-fixo').value = o.total;
+                // If we store total as (service + mat), we might need to subtract matCost 
+                // to show original service value, or just show total.
+                // Let's assume user enters service value and mat value separately now.
+                // For old OS, matCost is null.
+                document.getElementById('os-val-fixo').value = o.serviceVal || o.total;
             } else {
-                // For hourly, we don't store separate val/hour in the OS object currently
-                // but we can try to guess or just let user re-enter
+                document.getElementById('os-hours').value = o.hours || '';
+                document.getElementById('os-val-hour').value = o.rate || config.hourRate;
                 document.getElementById('group-fixo').style.display = 'none';
                 document.getElementById('group-hora').style.display = 'block';
                 document.getElementById('group-hora-2').style.display = 'block';
@@ -189,7 +217,7 @@ function initOS() {
         osType.onchange = (e) => {
             const isHora = e.target.value === 'hora';
             document.getElementById('group-fixo').style.display = isHora ? 'none' : 'block';
-            document.getElementById('group-hora').style.display = isHora ? 'block' : 'none';
+            document.getElementById('group-hora').style.display = 'block'; // Always keep rate visible if hourly
             document.getElementById('group-hora-2').style.display = isHora ? 'block' : 'none';
         };
     }
@@ -203,9 +231,12 @@ function initOS() {
             const cliente = clientes.find(c => c.id === document.getElementById('os-client').value);
             if (!cliente) { alert('Selecione um cliente!'); return; }
             
-            let total = 0;
-            if (type === 'fixo') total = parseFloat(document.getElementById('os-val-fixo').value || 0);
-            else total = parseFloat(document.getElementById('os-hours').value || 0) * parseFloat(document.getElementById('os-val-hour').value || 0);
+            let serviceVal = 0;
+            if (type === 'fixo') serviceVal = parseFloat(document.getElementById('os-val-fixo').value || 0);
+            else serviceVal = parseFloat(document.getElementById('os-hours').value || 0) * parseFloat(document.getElementById('os-val-hour').value || 0);
+
+            const matCost = parseFloat(document.getElementById('os-val-mat').value || 0);
+            const total = serviceVal + matCost;
 
             const osData = {
                 id: id || Date.now().toString(), 
@@ -213,6 +244,8 @@ function initOS() {
                 clientPhone: cliente.phone,
                 date: document.getElementById('os-date').value, 
                 desc: document.getElementById('os-desc').value,
+                serviceVal: serviceVal,
+                matCost: matCost,
                 total: total, 
                 type: type, 
                 hours: type === 'hora' ? parseFloat(document.getElementById('os-hours').value || 0) : null,
@@ -333,10 +366,18 @@ function initHistory() {
             currentFiltered.slice().reverse().forEach(o => {
                 const date = o.date.split('-').reverse().join('/');
                 message += `📅 ${date}\n🛠️ ${o.desc}\n`;
+                
                 if (o.type === 'hora' && o.hours && o.rate) {
-                    message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h\n`;
+                    message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h = R$ ${o.serviceVal.toFixed(2)}\n`;
+                } else if (o.serviceVal) {
+                    message += `💰 Serviço: R$ ${o.serviceVal.toFixed(2)}\n`;
                 }
-                message += `💰 R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
+
+                if (o.matCost) {
+                    message += `📦 Materiais: R$ ${o.matCost.toFixed(2)}\n`;
+                }
+                
+                message += `✅ *Subtotal:* R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
                 total += parseFloat(o.total);
             });
             
