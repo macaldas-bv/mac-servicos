@@ -70,6 +70,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Initialize specific page logic
     const path = window.location.pathname;
     if (path.includes('os-do-dia.html')) initTodayOS();
+    if (path.includes('agendamento.html')) initAgendamento();
     if (path.includes('clientes.html')) initCustomers();
     if (path.includes('nova-os.html')) initOS();
     if (path.includes('historico.html')) initHistory();
@@ -431,6 +432,48 @@ function initTodayOS() {
             <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
             <div class="card-footer">
                 <button class="btn btn-whatsapp btn-sm" onclick="sendWA('${o.id}')"><i data-lucide="send"></i> Zap</button>
+                <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
+                <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
+            </div>`;
+        list.appendChild(card);
+    });
+    refreshIcons();
+}
+
+// --- AGENDAMENTO (FUTUROS) ---
+function initAgendamento() {
+    const list = document.getElementById('agendamento-list');
+    if (!list) return;
+    
+    const today = new Date().toISOString().split('T')[0];
+    const futureOrders = ordens.filter(o => o.date > today);
+    
+    list.innerHTML = '';
+    
+    if (futureOrders.length === 0) {
+        list.innerHTML = '<div style="text-align:center; padding:3rem; color:var(--text-secondary)">Não há serviços agendados para os próximos dias.</div>';
+        return;
+    }
+
+    // Sort by date ascending for upcoming view
+    futureOrders.sort((a,b) => a.date.localeCompare(b.date));
+
+    futureOrders.forEach(o => {
+        const cliente = clientes.find(c => c.phone === o.clientPhone) || {};
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        card.innerHTML = `
+            <div class="card-header">
+                <div>
+                    <strong>${o.clientName}</strong><br>
+                    <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
+                </div>
+                <small>${o.date.split('-').reverse().join('/')}</small>
+            </div>
+            <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
+            <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
+            <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
+            <div class="card-footer">
                 <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
                 <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
             </div>`;
