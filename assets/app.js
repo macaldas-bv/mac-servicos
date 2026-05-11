@@ -56,6 +56,23 @@ window.sendWA = (id) => {
     window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
 };
 
+window.sendReceipt = (id) => {
+    const o = ordens.find(x => x.id === id);
+    if (!o) return;
+    
+    let message = `*RECIBO DE PAGAMENTO*\n`;
+    message += `----------------------------\n`;
+    message += `Recebi de: *${o.clientName}*\n`;
+    message += `A quantia de: *R$ ${parseFloat(o.total).toFixed(2)}*\n`;
+    message += `Referente a: ${o.desc}\n`;
+    message += `----------------------------\n`;
+    message += `📅 Data: ${o.date.split('-').reverse().join('/')}\n\n`;
+    
+    message += `_MAC SERVICE & MANUTENÇÕES_`;
+    
+    window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+};
+
 window.copyOS = (id) => {
     const o = ordens.find(x => x.id === id);
     if (!o) return;
@@ -278,6 +295,7 @@ function initHistory() {
     const filterMonth = document.getElementById('filter-month');
     const btnFilter = document.getElementById('btn-filter');
     const btnSendReport = document.getElementById('btn-send-report');
+    const btnSendReceipt = document.getElementById('btn-send-receipt');
     const summaryCard = document.getElementById('report-summary');
     const reportTotal = document.getElementById('report-total');
     const reportCount = document.getElementById('report-count');
@@ -334,6 +352,7 @@ function initHistory() {
                     <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
                     <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
                     <div class="card-footer">
+                        <button class="btn btn-whatsapp btn-sm" onclick="sendReceipt('${o.id}')"><i data-lucide="file-text"></i> Recibo</button>
                         <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
                     </div>`;
@@ -392,6 +411,29 @@ function initHistory() {
             }
             
             message += `_${config.name}_`;
+            
+            window.open(`https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+        };
+    }
+
+    if (btnSendReceipt) {
+        btnSendReceipt.onclick = () => {
+            if (currentFiltered.length === 0) return;
+            
+            const clientName = currentFiltered[0].clientName;
+            const clientPhone = currentFiltered[0].clientPhone;
+            const totalVal = currentFiltered.reduce((s, o) => s + parseFloat(o.total), 0);
+            const period = filterMonth.value ? filterMonth.value.split('-').reverse().join('/') : '';
+            
+            let message = `*RECIBO DE PAGAMENTO*\n`;
+            message += `----------------------------\n`;
+            message += `Recebi de: *${clientName}*\n`;
+            message += `A quantia de: *R$ ${totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
+            message += `Referente a serviços realizados em: ${period}\n`;
+            message += `----------------------------\n`;
+            message += `📅 Data: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
+            
+            message += `_MAC SERVICE & MANUTENÇÕES_`;
             
             window.open(`https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
         };
