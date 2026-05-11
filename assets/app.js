@@ -73,6 +73,108 @@ window.sendReceipt = (id) => {
     window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
 };
 
+window.generateReceiptImage = (data) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 800;
+    canvas.height = 1000;
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Border
+    ctx.strokeStyle = '#059669';
+    ctx.lineWidth = 20;
+    ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+
+    const logo = new Image();
+    logo.src = 'assets/logo.png';
+    
+    logo.onload = () => {
+        // Draw Logo
+        const logoWidth = 300;
+        const logoHeight = (logo.height * logoWidth) / logo.width;
+        ctx.drawImage(logo, (canvas.width - logoWidth) / 2, 80, logoWidth, logoHeight);
+
+        // Header
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 48px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('RECIBO DE PAGAMENTO', canvas.width / 2, 450);
+
+        // Separator
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(100, 480);
+        ctx.lineTo(700, 480);
+        ctx.stroke();
+
+        // Content
+        ctx.textAlign = 'left';
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillStyle = '#64748b';
+        
+        ctx.fillText('Recebi de:', 100, 550);
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 36px Inter, sans-serif';
+        ctx.fillText(data.clientName, 100, 600);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillText('A quantia de:', 100, 680);
+        ctx.fillStyle = '#059669';
+        ctx.font = 'bold 48px Inter, sans-serif';
+        ctx.fillText(`R$ ${data.total}`, 100, 740);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '32px Inter, sans-serif';
+        ctx.fillText('Referente a:', 100, 820);
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '32px Inter, sans-serif';
+        
+        // Wrap text for description
+        const desc = data.desc || '';
+        const words = desc.split(' ');
+        let line = '';
+        let y = 860;
+        for (let n = 0; n < words.length; n++) {
+            let testLine = line + words[n] + ' ';
+            let metrics = ctx.measureText(testLine);
+            if (metrics.width > 600 && n > 0) {
+                ctx.fillText(line, 100, y);
+                line = words[n] + ' ';
+                y += 40;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, 100, y);
+
+        // Footer
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 28px Inter, sans-serif';
+        ctx.fillText(`Data: ${data.date}`, canvas.width / 2, 930);
+        
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'italic bold 32px Inter, sans-serif';
+        ctx.fillText('MAC SERVICE & MANUTENÇÕES', canvas.width / 2, 970);
+
+        // Download
+        const link = document.createElement('a');
+        link.download = `recibo_${data.clientName.replace(/\s+/g, '_')}_${data.date.replace(/\//g, '-')}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.9);
+        link.click();
+        showToast('Recibo gerado e baixado!');
+    };
+
+    logo.onerror = () => {
+        alert('Erro ao carregar o logo em assets/logo.png. Certifique-se de salvar a imagem com este nome na pasta assets.');
+    };
+};
+
 window.copyOS = (id) => {
     const o = ordens.find(x => x.id === id);
     if (!o) return;
@@ -352,7 +454,13 @@ function initHistory() {
                     <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
                     <div style="margin-top:0.75rem;font-weight:800;color:var(--primary-color); font-size: 1.1rem;">R$ ${parseFloat(o.total).toFixed(2)}</div>
                     <div class="card-footer">
-                        <button class="btn btn-whatsapp btn-sm" onclick="sendReceipt('${o.id}')"><i data-lucide="file-text"></i> Recibo</button>
+                        <button class="btn btn-whatsapp btn-sm" onclick="sendReceipt('${o.id}')"><i data-lucide="send"></i> Zap</button>
+                        <button class="btn btn-primary btn-sm" onclick="generateReceiptImage({
+                            clientName: '${o.clientName}',
+                            total: '${parseFloat(o.total).toFixed(2)}',
+                            desc: '${o.desc.replace(/'/g, "\\'")}',
+                            date: '${o.date.split('-').reverse().join('/')}'
+                        })"><i data-lucide="image"></i> JPG</button>
                         <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
                     </div>`;
@@ -420,22 +528,15 @@ function initHistory() {
         btnSendReceipt.onclick = () => {
             if (currentFiltered.length === 0) return;
             
-            const clientName = currentFiltered[0].clientName;
-            const clientPhone = currentFiltered[0].clientPhone;
             const totalVal = currentFiltered.reduce((s, o) => s + parseFloat(o.total), 0);
             const period = filterMonth.value ? filterMonth.value.split('-').reverse().join('/') : '';
             
-            let message = `*RECIBO DE PAGAMENTO*\n`;
-            message += `----------------------------\n`;
-            message += `Recebi de: *${clientName}*\n`;
-            message += `A quantia de: *R$ ${totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n`;
-            message += `Referente a serviços realizados em: ${period}\n`;
-            message += `----------------------------\n`;
-            message += `📅 Data: ${new Date().toLocaleDateString('pt-BR')}\n\n`;
-            
-            message += `_MAC SERVICE & MANUTENÇÕES_`;
-            
-            window.open(`https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+            generateReceiptImage({
+                clientName: currentFiltered[0].clientName,
+                total: totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                desc: `Serviços realizados no período de ${period}`,
+                date: new Date().toLocaleDateString('pt-BR')
+            });
         };
     }
     
