@@ -1,4 +1,4 @@
-# MAC Service & Manutenções - Gestão de Ordens de Serviço
+# MAC Serviço e Manutenção - Gestão de Ordens de Serviço
 
 Sistema de gestão mobile-first para prestadores de serviços, focado em facilidade de uso e relatórios rápidos via WhatsApp.
 

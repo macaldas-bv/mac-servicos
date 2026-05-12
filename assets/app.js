@@ -68,7 +68,7 @@ window.sendReceipt = (id) => {
     message += `----------------------------\n`;
     message += `📅 Data: ${o.date.split('-').reverse().join('/')}\n\n`;
     
-    message += `_MAC SERVICE & MANUTENÇÕES_`;
+    message += `_MAC SERVIÇO E MANUTENÇÃO_`;
     
     window.open(`https://wa.me/55${o.clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
 };
@@ -160,7 +160,7 @@ window.generateReceiptImage = (data) => {
         
         ctx.fillStyle = '#0f172a';
         ctx.font = 'italic bold 32px Inter, sans-serif';
-        ctx.fillText('MAC SERVICE & MANUTENÇÕES', canvas.width / 2, 970);
+        ctx.fillText('MAC SERVIÇO E MANUTENÇÃO', canvas.width / 2, 970);
 
         // Download
         const link = document.createElement('a');
