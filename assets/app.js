@@ -24,13 +24,34 @@ const saveToLocal = () => {
     localStorage.setItem(KEYS.SETTINGS, JSON.stringify(config));
 };
 
+const generateOSNumber = (date) => {
+    const year = date ? new Date(date).getFullYear() : new Date().getFullYear();
+    const shortYear = year.toString().slice(-2);
+    const yearOrdens = ordens.filter(o => {
+        if (!o.osNumber) return false;
+        const parts = o.osNumber.split('/');
+        // Handle both 2 and 4 digit years in existing data if any
+        const oYear = parts[1].length === 2 ? "20" + parts[1] : parts[1];
+        return oYear === year.toString();
+    });
+
+    let nextNum = 1;
+    if (yearOrdens.length > 0) {
+        const nums = yearOrdens.map(o => parseInt(o.osNumber.split('/')[0]));
+        nextNum = Math.max(...nums) + 1;
+    }
+
+    return `${nextNum.toString().padStart(3, '0')}/${shortYear}`;
+};
+
 // --- SHARED UI FUNCTIONS ---
 window.sendWA = (id) => {
     const o = ordens.find(x => x.id === id);
     if (!o) return;
     
-    let message = `*RELATÓRIO DE SERVIÇO*\n`;
+    let message = `*ORDEM DE SERVIÇO*\n`;
     message += `📅 Data: ${o.date.split('-').reverse().join('/')}\n`;
+    if (o.osNumber) message += `🔢 OS: ${o.osNumber}\n`;
     message += `👤 Cliente: ${o.clientName}\n\n`;
     message += `*Serviço:*\n${o.desc}\n\n`;
     
@@ -60,12 +81,13 @@ window.sendReceipt = (id) => {
     const o = ordens.find(x => x.id === id);
     if (!o) return;
     
-    let message = `*RECIBO DE PAGAMENTO*\n`;
+    let message = `*RECIBO*\n`;
     message += `----------------------------\n`;
     message += `Recebi de: *${o.clientName}*\n`;
     message += `A quantia de: *R$ ${parseFloat(o.total).toFixed(2)}*\n`;
     message += `Referente a: ${o.desc}\n`;
     message += `----------------------------\n`;
+    if (o.osNumber) message += `🔢 OS: ${o.osNumber}\n`;
     message += `📅 Data: ${o.date.split('-').reverse().join('/')}\n\n`;
     
     message += `_MAC SERVIÇO E MANUTENÇÃO_`;
@@ -101,7 +123,13 @@ window.generateReceiptImage = (data) => {
         ctx.fillStyle = '#0f172a';
         ctx.font = 'bold 48px Inter, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText('RECIBO DE PAGAMENTO', canvas.width / 2, 450);
+        ctx.fillText('RECIBO', canvas.width / 2, 450);
+
+        if (data.osNumber) {
+            ctx.font = 'bold 24px Inter, sans-serif';
+            ctx.fillStyle = '#64748b';
+            ctx.fillText(`OS: ${data.osNumber}`, canvas.width / 2, 490);
+        }
 
         // Separator
         ctx.strokeStyle = '#e2e8f0';
@@ -222,7 +250,7 @@ function initDashboard() {
             const card = document.createElement('div');
             card.className = 'item-card';
             card.style.padding = '1rem';
-            card.innerHTML = `<strong>${o.clientName}</strong><br><small>${o.date.split('-').reverse().join('/')} - R$ ${parseFloat(o.total).toFixed(2)}</small>`;
+            card.innerHTML = `<strong>${o.clientName}</strong> ${o.osNumber ? '<small style="float:right; color:var(--primary-color)">#' + o.osNumber + '</small>' : ''}<br><small>${o.date.split('-').reverse().join('/')} - R$ ${parseFloat(o.total).toFixed(2)}</small>`;
             list.appendChild(card);
         });
     }
@@ -296,7 +324,26 @@ function initOS() {
     clientes.forEach(c => sel.innerHTML += `<option value="${c.id}">${c.name}</option>`);
     
     const dateInput = document.getElementById('os-date');
-    if (dateInput) dateInput.valueAsDate = new Date();
+    const osNumDisp = document.getElementById('os-number-display');
+    
+    const updateNumberPreview = () => {
+        const id = document.getElementById('os-id').value;
+        if (!id) { // Only preview if it's a NEW OS
+            if (osNumDisp) {
+                osNumDisp.innerText = generateOSNumber(dateInput.value);
+                osNumDisp.style.display = 'inline-block';
+            }
+        } else {
+            if (osNumDisp) osNumDisp.style.display = 'inline-block';
+        }
+    };
+
+    if (dateInput) {
+        dateInput.valueAsDate = new Date();
+        dateInput.onchange = updateNumberPreview;
+    }
+    
+    updateNumberPreview();
     
     const hourRateInput = document.getElementById('os-val-hour');
     if (hourRateInput) hourRateInput.value = config.hourRate;
@@ -307,6 +354,8 @@ function initOS() {
         const o = ordens.find(x => x.id === editId);
         if (o) {
             document.getElementById('os-id').value = o.id;
+            const osNumDisp = document.getElementById('os-number-display');
+            if (osNumDisp) osNumDisp.innerText = o.osNumber || '---';
             const client = clientes.find(c => c.phone === o.clientPhone);
             if (client) document.getElementById('os-client').value = client.id;
             document.getElementById('os-date').value = o.date;
@@ -369,6 +418,7 @@ function initOS() {
                 matCost: matCost,
                 total: total, 
                 type: type, 
+                osNumber: id ? (ordens.find(x => x.id === id)?.osNumber || generateOSNumber(document.getElementById('os-date').value)) : generateOSNumber(document.getElementById('os-date').value),
                 hours: type === 'hora' ? parseFloat(document.getElementById('os-hours').value || 0) : null,
                 rate: type === 'hora' ? parseFloat(document.getElementById('os-val-hour').value || 0) : null,
                 mat: document.getElementById('os-mat').value
@@ -393,7 +443,7 @@ function initHistory() {
     const list = document.getElementById('history-list');
     if (!list) return;
 
-    const filterClient = document.getElementById('filter-client');
+    const filterSearch = document.getElementById('filter-search');
     const filterMonth = document.getElementById('filter-month');
     const btnFilter = document.getElementById('btn-filter');
     const btnSendReport = document.getElementById('btn-send-report');
@@ -402,11 +452,6 @@ function initHistory() {
     const reportTotal = document.getElementById('report-total');
     const reportCount = document.getElementById('report-count');
 
-    // Populate client filter
-    if (filterClient) {
-        filterClient.innerHTML = '<option value="">Todos os Clientes</option>';
-        clientes.forEach(c => filterClient.innerHTML += `<option value="${c.phone}">${c.name}</option>`);
-    }
 
     // Set default month to current
     if (filterMonth && !filterMonth.value) {
@@ -417,13 +462,16 @@ function initHistory() {
     let currentFiltered = [];
 
     const renderFiltered = () => {
-        const clientVal = filterClient ? filterClient.value : '';
+        const searchVal = filterSearch ? filterSearch.value.toLowerCase() : '';
         const monthVal = filterMonth ? filterMonth.value : '';
 
         currentFiltered = ordens.slice().reverse();
 
-        if (clientVal) {
-            currentFiltered = currentFiltered.filter(o => o.clientPhone === clientVal);
+        if (searchVal) {
+            currentFiltered = currentFiltered.filter(o => 
+                o.clientName.toLowerCase().includes(searchVal) || 
+                (o.osNumber && o.osNumber.toLowerCase().includes(searchVal))
+            );
         }
 
         if (monthVal) {
@@ -448,7 +496,10 @@ function initHistory() {
                             <strong>${o.clientName}</strong><br>
                             <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
                         </div>
-                        <small>${o.date.split('-').reverse().join('/')}</small>
+                        <div style="text-align: right;">
+                            <small>${o.date.split('-').reverse().join('/')}</small><br>
+                            ${o.osNumber ? '<small style="font-weight:bold; color:var(--primary-color)">#' + o.osNumber + '</small>' : ''}
+                        </div>
                     </div>
                     <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
                     <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
@@ -459,7 +510,8 @@ function initHistory() {
                             clientName: '${o.clientName}',
                             total: '${parseFloat(o.total).toFixed(2)}',
                             desc: '${o.desc.replace(/'/g, "\\'")}',
-                            date: '${o.date.split('-').reverse().join('/')}'
+                            date: '${o.date.split('-').reverse().join('/')}',
+                            osNumber: '${o.osNumber || ''}'
                         })"><i data-lucide="image"></i> JPG</button>
                         <button class="btn btn-secondary btn-sm" onclick="editOS('${o.id}')"><i data-lucide="edit"></i></button>
                         <button class="btn btn-danger btn-sm" onclick="delOS('${o.id}')"><i data-lucide="trash"></i></button>
@@ -487,14 +539,14 @@ function initHistory() {
             const clientName = currentFiltered[0].clientName;
             let total = 0;
             
-            let message = `*RELATÓRIO DE SERVIÇOS*\n`;
+            let message = `*ORDENS DE SERVIÇO*\n`;
             message += `👤 *Cliente:* ${clientName}\n`;
             message += `📅 *Período:* ${filterMonth.value.split('-').reverse().join('/')}\n`;
             message += `----------------------------\n\n`;
             
             currentFiltered.slice().reverse().forEach(o => {
                 const date = o.date.split('-').reverse().join('/');
-                message += `📅 ${date}\n🛠️ ${o.desc}\n`;
+                message += `📅 ${date} ${o.osNumber ? '[OS: ' + o.osNumber + ']' : ''}\n🛠️ ${o.desc}\n`;
                 
                 if (o.type === 'hora' && o.hours && o.rate) {
                     message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h = R$ ${o.serviceVal.toFixed(2)}\n`;
@@ -535,7 +587,8 @@ function initHistory() {
                 clientName: currentFiltered[0].clientName,
                 total: totalVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
                 desc: `Serviços realizados no período de ${period}`,
-                date: new Date().toLocaleDateString('pt-BR')
+                date: new Date().toLocaleDateString('pt-BR'),
+                osNumber: '' // Relatório consolidado não tem OS única
             });
         };
     }
@@ -568,7 +621,10 @@ function initTodayOS() {
                     <strong>${o.clientName}</strong><br>
                     <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
                 </div>
-                <small>${o.date.split('-').reverse().join('/')}</small>
+                <div style="text-align: right;">
+                    <small>${o.date.split('-').reverse().join('/')}</small><br>
+                    ${o.osNumber ? '<small style="font-weight:bold; color:var(--primary-color)">#' + o.osNumber + '</small>' : ''}
+                </div>
             </div>
             <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
             <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
@@ -611,7 +667,10 @@ function initAgendamento() {
                     <strong>${o.clientName}</strong><br>
                     <small style="color:var(--primary-color)">${cliente.city || ''}${cliente.address ? ' - ' + cliente.address : ''}</small>
                 </div>
-                <small>${o.date.split('-').reverse().join('/')}</small>
+                <div style="text-align: right;">
+                    <small>${o.date.split('-').reverse().join('/')}</small><br>
+                    ${o.osNumber ? '<small style="font-weight:bold; color:var(--primary-color)">#' + o.osNumber + '</small>' : ''}
+                </div>
             </div>
             <p style="font-size:0.9rem;color:var(--text-secondary); margin-bottom: 0.5rem;">${o.desc}</p>
             <div style="font-size:0.8rem; color:var(--text-secondary)">📞 ${o.clientPhone}</div>
