@@ -270,8 +270,26 @@ function initCustomers() {
                 city: document.getElementById('cust-city').value,
                 address: document.getElementById('cust-address').value
             };
-            if (id) { const idx = clientes.findIndex(c => c.id === id); clientes[idx] = data; }
-            else { clientes.push(data); }
+            if (id) { 
+                const idx = clientes.findIndex(c => c.id === id); 
+                const oldClient = clientes[idx];
+                
+                // Propaga as alterações para as Ordens de Serviço antigas
+                if (oldClient) {
+                    ordens.forEach(o => {
+                        // Compara pelo ID (novo padrão) ou pelo Nome (para recuperar cadastros que ficaram com telefone antigo)
+                        if (o.clientId === id || o.clientName === oldClient.name) {
+                            o.clientId = data.id;
+                            o.clientName = data.name;
+                            o.clientPhone = data.phone;
+                        }
+                    });
+                }
+                
+                clientes[idx] = data; 
+            } else { 
+                clientes.push(data); 
+            }
             saveToLocal();
             e.target.reset(); document.getElementById('cust-id').value = '';
             showToast('Cliente salvo!'); renderCustomers();
@@ -410,6 +428,7 @@ function initOS() {
 
             const osData = {
                 id: id || Date.now().toString(), 
+                clientId: cliente.id,
                 clientName: cliente.name, 
                 clientPhone: cliente.phone,
                 date: document.getElementById('os-date').value, 
@@ -535,44 +554,108 @@ function initHistory() {
         btnSendReport.onclick = () => {
             if (currentFiltered.length === 0) return;
             
-            const clientPhone = currentFiltered[0].clientPhone;
             const clientName = currentFiltered[0].clientName;
             let total = 0;
             
-            let message = `*ORDENS DE SERVIÇO*\n`;
-            message += `👤 *Cliente:* ${clientName}\n`;
-            message += `📅 *Período:* ${filterMonth.value.split('-').reverse().join('/')}\n`;
-            message += `----------------------------\n\n`;
+            let htmlContent = `
+                <div style="font-family: 'Inter', sans-serif; padding: 40px; background: #ffffff; color: #0f172a; width: 600px; box-sizing: border-box; border: 10px solid #059669;">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <img src="assets/logo.png" style="width: 200px; margin-bottom: 20px;">
+                        <h2 style="font-size: 28px; margin: 0;">RELATÓRIO DE SERVIÇOS</h2>
+                        <p style="color: #64748b; font-size: 16px; margin-top: 10px;">Cliente: <strong>${clientName}</strong><br>Período: ${filterMonth.value ? filterMonth.value.split('-').reverse().join('/') : 'Todos'}</p>
+                    </div>
+                    <div style="border-bottom: 2px solid #e2e8f0; margin-bottom: 20px;"></div>
+            `;
             
             currentFiltered.slice().reverse().forEach(o => {
                 const date = o.date.split('-').reverse().join('/');
-                message += `📅 ${date} ${o.osNumber ? '[OS: ' + o.osNumber + ']' : ''}\n🛠️ ${o.desc}\n`;
+                htmlContent += `
+                    <div style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <strong style="font-size: 18px;">${date} ${o.osNumber ? '<span style="color:#059669">#' + o.osNumber + '</span>' : ''}</strong>
+                            <strong style="font-size: 18px;">R$ ${parseFloat(o.total).toFixed(2)}</strong>
+                        </div>
+                        <p style="margin: 0 0 5px 0; color: #475569; font-size: 15px;">🛠️ ${o.desc}</p>
+                `;
                 
                 if (o.type === 'hora' && o.hours && o.rate) {
-                    message += `⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h = R$ ${o.serviceVal.toFixed(2)}\n`;
+                    htmlContent += `<p style="margin: 0; font-size: 13px; color: #64748b;">⏱️ ${o.hours}h x R$ ${o.rate.toFixed(2)}/h = R$ ${o.serviceVal.toFixed(2)}</p>`;
                 } else if (o.serviceVal) {
-                    message += `💰 Serviço: R$ ${o.serviceVal.toFixed(2)}\n`;
+                    htmlContent += `<p style="margin: 0; font-size: 13px; color: #64748b;">💰 Mão de Obra: R$ ${o.serviceVal.toFixed(2)}</p>`;
                 }
 
                 if (o.matCost) {
-                    message += `📦 Materiais: R$ ${o.matCost.toFixed(2)}\n`;
-                    if (o.mat) message += `📝 Itens: ${o.mat}\n`;
+                    htmlContent += `<p style="margin: 0; font-size: 13px; color: #64748b;">📦 Materiais: R$ ${o.matCost.toFixed(2)}${o.mat ? ' (' + o.mat + ')' : ''}</p>`;
                 }
                 
-                message += `✅ *Subtotal:* R$ ${parseFloat(o.total).toFixed(2)}\n\n`;
+                htmlContent += `</div>`;
                 total += parseFloat(o.total);
             });
             
-            message += `----------------------------\n`;
-            message += `*TOTAL:* R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n`;
+            htmlContent += `
+                    <div style="border-top: 2px solid #e2e8f0; padding-top: 20px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 24px; font-weight: bold; color: #0f172a;">TOTAL</span>
+                        <span style="font-size: 32px; font-weight: 900; color: #059669;">R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+            `;
             
             if (config.pix) {
-                message += `*PAGAMENTO PIX:*\n🔑 Chave: ${config.pix}\n\n`;
+                htmlContent += `
+                    <div style="margin-top: 30px; background: #f8fafc; padding: 15px; border-radius: 8px; text-align: center; border: 1px dashed #cbd5e1;">
+                        <span style="display: block; font-weight: bold; color: #0f172a; margin-bottom: 5px;">PAGAMENTO PIX</span>
+                        <span style="color: #64748b;">Chave: <strong>${config.pix}</strong></span>
+                    </div>
+                `;
             }
             
-            message += `_${config.name}_`;
+            htmlContent += `
+                    <div style="text-align: center; margin-top: 40px; font-style: italic; color: #64748b; font-weight: bold; font-size: 20px;">
+                        MAC SERVIÇO E MANUTENÇÃO
+                    </div>
+                </div>
+            `;
+
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = '-9999px';
+            wrapper.style.top = '0';
+            wrapper.innerHTML = htmlContent;
+            document.body.appendChild(wrapper);
             
-            window.open(`https://wa.me/55${clientPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`, '_blank');
+            const btn = document.getElementById('btn-send-report');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="loader"></i> Gerando...';
+            refreshIcons();
+
+            setTimeout(() => {
+                if (window.html2canvas) {
+                    html2canvas(wrapper.firstElementChild, {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        useCORS: true
+                    }).then(canvas => {
+                        const link = document.createElement('a');
+                        link.download = `Relatorio_${clientName.replace(/\s+/g, '_')}_${filterMonth.value || 'Total'}.jpg`;
+                        link.href = canvas.toDataURL('image/jpeg', 0.9);
+                        link.click();
+                        document.body.removeChild(wrapper);
+                        btn.innerHTML = originalHTML;
+                        refreshIcons();
+                        showToast('Relatório gerado em JPG!');
+                    }).catch(err => {
+                        console.error('Erro ao gerar JPG', err);
+                        alert('Erro ao gerar imagem.');
+                        document.body.removeChild(wrapper);
+                        btn.innerHTML = originalHTML;
+                        refreshIcons();
+                    });
+                } else {
+                    alert('Erro: Biblioteca html2canvas não carregada.');
+                    document.body.removeChild(wrapper);
+                    btn.innerHTML = originalHTML;
+                    refreshIcons();
+                }
+            }, 500);
         };
     }
 
